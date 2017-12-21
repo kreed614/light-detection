@@ -1,0 +1,126 @@
+#include <Servo.h>
+
+const int sensor1 = A0;  //indicates clockwise rotation
+const int sensor2 = A1;  //middle sensor 
+const int sensor3 = A2;  //indicates counter clockwise rotation
+
+Servo servo; //initialize servo object
+int servoAngle = 0; //set to an obscure value
+
+//misc int variables 
+int sensorValue1, sensorValue2, sensorValue3, state; 
+
+void setup() {
+  // initialize serial communications at 9600 bps:
+  Serial.begin(9600);
+}
+
+void loop() {
+  if (servoAngle < 1){ //obscure value only allows on first iteration
+    ServoAction(3);
+    delay(1000); 
+  }  
+  Read(); //reads sensor values
+  Print(); //prints values to serial monitor 
+  
+  /*-------------------------MAIN LOOP--------------------------------------
+   * The first condition checks for light, then it either continues or
+   * goes to the reset function which sets the panel flat. This is ideal for 
+   * night time so the panel remains in a poistion optimal for finding light
+   * when it becomes present. If it passes the first condition it will  
+   * check if either of the periperal sensors read higher than the middle 
+   * sensor. If this condition is true the panel will need to find the  
+   * position required for optimal sunlight. If the condition is false, the 
+   * panel is already in the optimal position and will delay for a period
+   * of time until it should rescan to evaluate its position.
+   * 
+   * **ADJUST THE INITIAL CONDITION BASED ON ENVIRONMENTAL CONDITIONS**
+   -----------------------------------------------------------------------*/
+  if (sensorValue2 > 10){ 
+    if (sensorValue1 > sensorValue2 || sensorValue3 > sensorValue2){
+       Find();
+    }
+    else { 
+      servo.detach();    
+      delay(6000); //**DETERMINES TIME BETWEEN SCANS** 
+    }
+  }  
+  else {
+    Reset();
+  }
+}//end loop 
+
+//-------------------------FUNCTION DEFINITIONS--------------------------|
+
+void ServoAction (int state){
+  servoAngle = constrain(servoAngle, 35, 130); //**ADJUST FOR MAX ANGLE**
+  servo.attach(7); //activates servo
+  switch (state){//rotates servo counter clockwise
+    case 1: 
+      servoAngle = (servoAngle + 1);
+      if (servoAngle < 130){ //**ADJUST WITH CONSTRAIN VALUE**
+        servo.write(servoAngle);
+      }
+      else{ 
+        servo.detach();
+      }
+      break; 
+    case 2: //rotates servo clockwise 
+      servoAngle = (servoAngle - 1); 
+      if (servoAngle > 35){ //**ADJUST WITH CONSTRAIN VALUE**
+        servo.write(servoAngle);
+      }
+      else{ 
+        servo.detach();
+      }
+      break;  
+    case 3: //sets the panel flat
+      servoAngle = 75;
+      servo.write(servoAngle); 
+      break;
+    default: 
+      servo.detach();
+  } 
+}
+
+void Find(){ 
+ //while either peripheral sensor is greater than the middle 
+ while(sensorValue2 < sensorValue3 || sensorValue2 < sensorValue1){
+    if (sensorValue1 > sensorValue3){
+        ServoAction(2); //rotates clockwise
+    }
+    if (sensorValue3 > sensorValue1){
+        ServoAction(1); //rotates counter clockwise 
+    }
+    delay(250);
+    Read();
+    Print();
+ }
+}
+
+void Reset(){
+  ServoAction(3); //sets panel flat
+  delay(250);
+  servo.detach();
+  Print();
+  delay(6000);//**ADJUST FOR NIGHTTIME SCANS**
+}
+
+void Print(){
+  Serial.print("Servo Angle = ");
+  Serial.print(servoAngle);
+  Serial.print("\t sensor 1 = ");
+  Serial.print(sensorValue1);
+  Serial.print("\t sensor 2 = ");
+  Serial.print(sensorValue2);
+  Serial.print("\t sensor 3 = ");
+  Serial.println(sensorValue3);
+}
+
+void Read(){
+  //gets reading from each sensor
+  sensorValue1 = analogRead(sensor1); 
+  sensorValue2 = analogRead(sensor2);
+  sensorValue3 = analogRead(sensor3);
+}
+
